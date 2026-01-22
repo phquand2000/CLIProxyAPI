@@ -19,5 +19,5 @@ jobs:
           cache: true
       - name: Build
         run: |
-          go build -o test-output ./cmd/server
+          go build -o test-output ./cmd/letta-server
           rm -f test-output

@@ -9,8 +9,8 @@ builds:
     goarch:
       - amd64
       - arm64
-    main: ./cmd/server/
-    binary: cli-proxy-api
+    main: ./cmd/letta-server/
+    binary: CLIProxyAPI
     ldflags:
       - -s -w -X 'main.Version={{.Version}}' -X 'main.Commit={{.ShortCommit}}' -X 'main.BuildDate={{.Date}}'
 archives:
