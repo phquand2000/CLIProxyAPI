@@ -1,0 +1,49 @@
+name: Auto Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cmd/letta-server/**'
+      - 'sdk/**'
+      - 'internal/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.goreleaser.yml'
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          # Get latest letta tag or start from v7.0.0
+          LATEST=$(git tag -l 'v*-letta' --sort=-v:refname | head -1)
+          if [ -z "$LATEST" ]; then
+            NEW_TAG="v7.0.0-letta"
+          else
+            # Increment patch version
+            VERSION=${LATEST%-letta}
+            VERSION=${VERSION#v}
+            MAJOR=$(echo $VERSION | cut -d. -f1)
+            MINOR=$(echo $VERSION | cut -d. -f2)
+            PATCH=$(echo $VERSION | cut -d. -f3)
+            PATCH=$((PATCH + 1))
+            NEW_TAG="v${MAJOR}.${MINOR}.${PATCH}-letta"
+          fi
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+          echo "New tag: $NEW_TAG"
+
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag ${{ steps.get_tag.outputs.new_tag }}
+          git push origin ${{ steps.get_tag.outputs.new_tag }}
