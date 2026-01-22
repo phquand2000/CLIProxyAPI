@@ -45,3 +45,9 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag ${{ steps.get_tag.outputs.new_tag }}
           git push origin ${{ steps.get_tag.outputs.new_tag }}
+
+  call-release:
+    needs: create-release
+    uses: ./.github/workflows/release.yaml
+    permissions:
+      contents: write

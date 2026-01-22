@@ -5,6 +5,7 @@ on:
     # run only against tags
     tags:
       - '*'
+  workflow_call:  # Allow other workflows to call this
 
 permissions:
   contents: write
