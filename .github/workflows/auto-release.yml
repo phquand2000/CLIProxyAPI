@@ -6,6 +6,7 @@ on:
     paths:
       - 'cmd/letta-server/**'
       - '.goreleaser.yml'
+      - '.github/workflows/auto-release.yml'
   workflow_dispatch:  # Manual trigger
 
 jobs:
