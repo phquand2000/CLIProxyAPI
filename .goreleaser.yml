@@ -2,13 +2,9 @@ builds:
   - id: "cli-proxy-api"
     env:
       - CGO_ENABLED=0
-    goos:
-      - linux
-      - windows
-      - darwin
-    goarch:
-      - amd64
-      - arm64
+    targets:
+      - darwin_arm64
+      - windows_amd64
     main: ./cmd/letta-server/
     binary: CLIProxyAPI
     ldflags:

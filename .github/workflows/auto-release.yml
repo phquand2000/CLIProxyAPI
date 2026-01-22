@@ -5,11 +5,8 @@ on:
     branches: [main]
     paths:
       - 'cmd/letta-server/**'
-      - 'sdk/**'
-      - 'internal/**'
-      - 'go.mod'
-      - 'go.sum'
       - '.goreleaser.yml'
+  workflow_dispatch:  # Manual trigger
 
 jobs:
   create-release:

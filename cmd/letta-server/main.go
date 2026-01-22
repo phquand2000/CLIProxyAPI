@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	configaccess "github.com/router-for-me/CLIProxyAPI/v6/internal/access/config_access"
+	_ "github.com/router-for-me/CLIProxyAPI/v6/internal/translator"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/api"
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v6/sdk/auth"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy"
@@ -373,14 +375,34 @@ func main() {
 	}
 
 	// Load CLIProxyAPI config
+	// Support --config flag like the original server
 	configPath := "config.yaml"
+	for i, arg := range os.Args[1:] {
+		if arg == "--config" && i+1 < len(os.Args[1:]) {
+			configPath = os.Args[i+2]
+			break
+		} else if strings.HasPrefix(arg, "--config=") {
+			configPath = strings.TrimPrefix(arg, "--config=")
+			break
+		}
+	}
 	if envPath := os.Getenv("CONFIG_PATH"); envPath != "" {
 		configPath = envPath
 	}
 
-	cfg, err := config.LoadConfig(configPath)
+	cfg, err := config.LoadConfigOptional(configPath, true)
 	if err != nil {
 		panic(fmt.Sprintf("failed to load config: %v", err))
+	}
+	if cfg == nil {
+		cfg = &config.Config{}
+	}
+	// Set defaults if not configured
+	if cfg.Port == 0 {
+		cfg.Port = 8317
+	}
+	if cfg.AuthDir == "" {
+		cfg.AuthDir = "~/.cli-proxy-api"
 	}
 
 	// Setup auth manager
@@ -389,6 +411,9 @@ func main() {
 		dirSetter.SetBaseDir(cfg.AuthDir)
 	}
 	core := coreauth.NewManager(tokenStore, nil, nil)
+
+	// Register access providers (required for api-key authentication)
+	configaccess.Register()
 
 	// Build service with memory injection middleware
 	svc, err := cliproxy.NewBuilder().
