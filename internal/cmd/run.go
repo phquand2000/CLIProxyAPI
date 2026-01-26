@@ -12,6 +12,7 @@ import (
 
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/api"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/letta"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy"
 	log "github.com/sirupsen/logrus"
 )
@@ -29,6 +30,11 @@ func StartService(cfg *config.Config, configPath string, localPassword string) {
 		WithConfig(cfg).
 		WithConfigPath(configPath).
 		WithLocalManagementPassword(localPassword)
+
+	// Add Letta memory injection middleware if enabled via LETTA_ENABLED=true
+	if lettaMw := letta.NewMiddleware(); lettaMw != nil {
+		builder = builder.WithServerOptions(api.WithMiddleware(lettaMw))
+	}
 
 	ctxSignal, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()

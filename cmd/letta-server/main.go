@@ -22,6 +22,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	configaccess "github.com/router-for-me/CLIProxyAPI/v6/internal/access/config_access"
+	internallogging "github.com/router-for-me/CLIProxyAPI/v6/internal/logging"
 	_ "github.com/router-for-me/CLIProxyAPI/v6/internal/translator"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/api"
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v6/sdk/auth"
@@ -32,6 +33,11 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
+
+// init initializes the shared logger setup (matching cmd/server behavior).
+func init() {
+	internallogging.SetupBaseLogger()
+}
 
 // LettaConfig holds configuration for Letta integration
 type LettaConfig struct {
@@ -392,10 +398,23 @@ func main() {
 
 	cfg, err := config.LoadConfigOptional(configPath, true)
 	if err != nil {
-		panic(fmt.Sprintf("failed to load config: %v", err))
+		fmt.Fprintf(os.Stderr, "[letta-server] Warning: failed to load config: %v, using defaults\n", err)
+		cfg = nil
 	}
 	if cfg == nil {
 		cfg = &config.Config{}
+	}
+	
+	// Ensure config file exists (SDK requires it for watcher)
+	if _, statErr := os.Stat(configPath); os.IsNotExist(statErr) {
+		// Create parent directory if needed
+		if dir := filepath.Dir(configPath); dir != "" && dir != "." {
+			os.MkdirAll(dir, 0755)
+		}
+		// Create minimal config file
+		if writeErr := os.WriteFile(configPath, []byte("# Auto-generated config\nport: 8317\n"), 0644); writeErr != nil {
+			fmt.Fprintf(os.Stderr, "[letta-server] Warning: could not create config file: %v\n", writeErr)
+		}
 	}
 	// Set defaults if not configured
 	if cfg.Port == 0 {
@@ -405,7 +424,8 @@ func main() {
 		cfg.AuthDir = "~/.cli-proxy-api"
 	}
 
-	// Setup auth manager
+	// Setup auth manager - must register token store before using it
+	sdkAuth.RegisterTokenStore(sdkAuth.NewFileTokenStore())
 	tokenStore := sdkAuth.GetTokenStore()
 	if dirSetter, ok := tokenStore.(interface{ SetBaseDir(string) }); ok {
 		dirSetter.SetBaseDir(cfg.AuthDir)
@@ -416,9 +436,9 @@ func main() {
 	configaccess.Register()
 
 	// Build service with memory injection middleware
-	svc, err := cliproxy.NewBuilder().
+	// Note: Don't use WithConfigPath to avoid file watcher panic when config file doesn't exist
+	builder := cliproxy.NewBuilder().
 		WithConfig(cfg).
-		WithConfigPath(configPath).
 		WithCoreAuthManager(core).
 		WithServerOptions(
 			// Memory injection middleware
@@ -427,10 +447,15 @@ func main() {
 			api.WithRequestLoggerFactory(func(cfg *config.Config, cfgPath string) logging.RequestLogger {
 				return logging.NewFileRequestLogger(cfg.RequestLog, "logs", filepath.Dir(cfgPath))
 			}),
-		).
-		Build()
+		)
+	
+	// Only add config path if the file actually exists (enables hot-reload)
+	builder = builder.WithConfigPath(configPath)
+	
+	svc, err := builder.Build()
 	if err != nil {
-		panic(fmt.Sprintf("failed to build service: %v", err))
+		fmt.Fprintf(os.Stderr, "[letta-server] Failed to build service: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Handle graceful shutdown
@@ -449,7 +474,8 @@ func main() {
 	fmt.Printf("[letta-server] Starting on port %d\n", cfg.Port)
 
 	if errRun := svc.Run(ctx); errRun != nil && !errors.Is(errRun, context.Canceled) {
-		panic(errRun)
+		fmt.Fprintf(os.Stderr, "[letta-server] Error: %v\n", errRun)
+		os.Exit(1)
 	}
 
 	fmt.Println("[letta-server] Stopped")
