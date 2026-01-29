@@ -1,16 +1,20 @@
 builds:
-  - id: "cli-proxy-api"
+  - id: "cli-proxy-api-plus"
     env:
       - CGO_ENABLED=0
-    targets:
-      - darwin_arm64
-      - windows_amd64
-    main: ./cmd/letta-server/
-    binary: CLIProxyAPI
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    main: ./cmd/server/
+    binary: cli-proxy-api-plus
     ldflags:
-      - -s -w -X 'main.Version={{.Version}}' -X 'main.Commit={{.ShortCommit}}' -X 'main.BuildDate={{.Date}}'
+      - -s -w -X 'main.Version={{.Version}}-plus' -X 'main.Commit={{.ShortCommit}}' -X 'main.BuildDate={{.Date}}'
 archives:
-  - id: "cli-proxy-api"
+  - id: "cli-proxy-api-plus"
     format: tar.gz
     format_overrides:
       - goos: windows
